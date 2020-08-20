@@ -1,0 +1,71 @@
+name: test
+
+schemes:
+    test:
+        build:
+            targets:
+                test: all
+        run:
+            environmentVariables:
+                VULKAN_SDK: $(PROJECT_DIR)/Libraries/vulkansdk/macOS
+                VK_LAYER_PATH: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/share/vulkan/explicit_layer.d
+                VK_ICD_FILENAMES: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/share/vulkan/icd.d/MoltenVK_icd.json
+        test:
+            environmentVariables:
+                VULKAN_SDK: $(PROJECT_DIR)/Libraries/vulkansdk/macOS
+                VK_LAYER_PATH: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/share/vulkan/explicit_layer.d
+                VK_ICD_FILENAMES: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/share/vulkan/icd.d/MoltenVK_icd.json
+        profile:
+            environmentVariables:
+                VULKAN_SDK: $(PROJECT_DIR)/Libraries/vulkansdk/macOS
+                VK_LAYER_PATH: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/share/vulkan/explicit_layer.d
+                VK_ICD_FILENAMES: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/share/vulkan/icd.d/MoltenVK_icd.json
+
+options:
+    createIntermediateGroups: true
+    usesTabs: false
+    indentWidth: 4
+    tabWidth: 4
+
+settings:
+    CLANG_CXX_LANGUAGE_STANDARD: c++17
+    CLANG_CXX_LIBRARY: libc++
+    GCC_C_LANGUAGE_STANDARD: c11
+    CLANG_WARN_DOCUMENTATION_COMMENTS: false
+
+targets:
+    test:
+        type: application
+        platform: macOS
+        info:
+            path: Generated/Info.plist
+        entitlements:
+            path: Generated/app.entitlements
+        sources:
+            - path: ../src
+              buildPhase: sources
+        settings:
+            HEADER_SEARCH_PATHS:
+                - $(PROJECT_DIR)/Libraries/vulkansdk/MoltenVK/include
+                - $(PROJECT_DIR)/Libraries/glfw/include
+            LIBRARY_SEARCH_PATHS:
+                - $(PROJECT_DIR)/Libraries/glfw/lib-macos
+                - $(PROJECT_DIR)/Libraries/vulkansdk/macOS/lib
+        dependencies:
+            - framework: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/lib/libvulkan.1.dylib
+            - sdk: Metal.framework
+            - sdk: IOSurface.framework
+            - sdk: QuartzCore.framework
+            - framework: $(PROJECT_DIR)/Libraries/glfw/lib-macos/libglfw3.a
+              embed: false
+            - sdk: Cocoa.framework
+            - sdk: IOKit.framework
+        buildRules:
+            - filePattern: "*.frag"
+              script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-frag.spv
+              outputFiles:
+                  - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-frag.spv
+            - filePattern: "*.vert"
+              script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-vert.spv
+              outputFiles:
+                  - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-vert.spv

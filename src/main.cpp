@@ -1,4 +1,4 @@
-#define GLFW_INCLUDE_VULKAN
+#include <MoltenVK/mvk_vulkan.h>
 #include <GLFW/glfw3.h>
 
 #include <stdlib.h>
@@ -8,11 +8,10 @@
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
-const uint32_t validationLayersCount = 2;
+const uint32_t validationLayersCount = 1;
 
 const char* validationLayers[validationLayersCount] = {
-	"VK_LAYER_KHRONOS_validation",
-	"VK_LAYER_LUNARG_monitor"
+	"VK_LAYER_KHRONOS_validation"
 };
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -144,6 +143,8 @@ const uint16_t indices[] = {
 bool checkValidationLayerSupport() {
 	uint32_t layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    
+    printf("%u\n", layerCount);
 
 	VkLayerProperties* availableLayers = new VkLayerProperties[layerCount];
 	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
@@ -152,6 +153,7 @@ bool checkValidationLayerSupport() {
 		bool layerFound = false;
 
 		for (uint32_t i = 0; i < layerCount; i++) {
+            printf("%s\n", availableLayers[i].layerName);
 			if (strcmp(layerName, availableLayers[i].layerName) == 0) {
 				layerFound = true;
 				break;
@@ -313,11 +315,10 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
 
 	VkExtensionProperties* availableExtensions = new VkExtensionProperties[extensionCount];
 	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions);
-
-	uint32_t found = 0;
+    
 	for (uint32_t i = 0; i < extensionCount; i++) {
 		if (strcmp(availableExtensions[i].extensionName, deviceExtensions[0]) == 0) {
-			return true;
+            return true;
 		}
 	}
 
@@ -426,7 +427,7 @@ void createSwapchain() {
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 	QueueFamilyIndices indices = findQueueFamilies(physicalDevice, surface);
-	uint32_t queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
+    uint32_t queueFamilyIndices[] = { static_cast<uint32_t>(indices.graphicsFamily), static_cast<uint32_t>(indices.presentFamily) };
 
 	if (indices.graphicsFamily != indices.presentFamily) {
 		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -490,7 +491,7 @@ void pickPhysicalDevice() {
 void createLogicalDevice() {
 	QueueFamilyIndices indices = findQueueFamilies(physicalDevice, surface);
 	
-	uint32_t uniqueQueueFamilies[2] = { indices.graphicsFamily, indices.presentFamily };
+    uint32_t uniqueQueueFamilies[2] = { static_cast<uint32_t>(indices.graphicsFamily), static_cast<uint32_t>(indices.presentFamily) };
 
 	int queueCount = 2;
 	if (uniqueQueueFamilies[0] == uniqueQueueFamilies[1]) {
@@ -563,23 +564,18 @@ void createImageViews() {
 
 static char* readFile(const char* filename, long* filesize) {
 	FILE* fp;
-	errno_t err;
-	if ((err = fopen_s(&fp, filename, "rb")) != 0) {
-		printf("failed to read shader file: %d\n", err);
-		exit(-1);
-	} else {
-		fseek(fp, 0L, SEEK_END);
-		long sz = ftell(fp);
-		rewind(fp);
-		char* buffer = new char[sz];
-		fread(buffer, sizeof(char), sz / sizeof(char), fp);
+    fp = fopen(filename, "rb");
+    fseek(fp, 0L, SEEK_END);
+    long sz = ftell(fp);
+    rewind(fp);
+    char* buffer = new char[sz];
+    fread(buffer, sizeof(char), sz / sizeof(char), fp);
 
-		fclose(fp);
+    fclose(fp);
 
-		*filesize = sz;
+    *filesize = sz;
 
-		return buffer;
-	}
+    return buffer;
 }
 
 VkShaderModule createShaderModule(const char* code, long codeSize, VkDevice device) {
@@ -643,8 +639,8 @@ void createRenderPass() {
 void createGraphicsPipeline() {
 	long vertShaderSize;
 	long fragShaderSize;
-	char* vertShaderCode = readFile("shaders/vert.spv", &vertShaderSize);
-	char* fragShaderCode = readFile("shaders/frag.spv", &fragShaderSize);
+	char* vertShaderCode = readFile("shaders/shader-vert.spv", &vertShaderSize);
+	char* fragShaderCode = readFile("shaders/shader-frag.spv", &fragShaderSize);
 
 	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, vertShaderSize, device);
 	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, fragShaderSize, device);

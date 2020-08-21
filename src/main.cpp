@@ -317,8 +317,6 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
 		if (indices.isComplete()) {
 			break;
 		}
-
-		i++;
 	}
 
 	return indices;

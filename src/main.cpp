@@ -14,14 +14,14 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 const uint32_t validationLayersCount = 1;
-
 const char* validationLayers[validationLayersCount] = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
-const char* deviceExtensions[1] = {
+const uint32_t deviceExtensionsCount = 1;
+const char* deviceExtensions[deviceExtensionsCount] = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
@@ -331,10 +331,17 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
 	VkExtensionProperties* availableExtensions = new VkExtensionProperties[extensionCount];
 	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions);
     
+    uint32_t found = 0;
+    
 	for (uint32_t i = 0; i < extensionCount; i++) {
-		if (strcmp(availableExtensions[i].extensionName, deviceExtensions[0]) == 0) {
-            return true;
-		}
+        for (uint32_t j = 0; j < deviceExtensionsCount; j++) {
+            if (strcmp(availableExtensions[i].extensionName, deviceExtensions[j]) == 0) {
+                found++;
+            }
+            if (found >= deviceExtensionsCount) {
+                return true;
+            }
+        }
 	}
 
 	return false;

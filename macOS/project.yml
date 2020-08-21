@@ -61,11 +61,7 @@ targets:
             - sdk: Cocoa.framework
             - sdk: IOKit.framework
         buildRules:
-            - filePattern: "*.frag"
-              script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-frag.spv
+            - filePattern: "*.frag *.vert"
+              script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_NAME.spv
               outputFiles:
-                  - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-frag.spv
-            - filePattern: "*.vert"
-              script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-vert.spv
-              outputFiles:
-                  - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_BASE-vert.spv
+                  - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_NAME.spv

@@ -659,8 +659,8 @@ void createRenderPass() {
 void createGraphicsPipeline() {
 	long vertShaderSize;
 	long fragShaderSize;
-	char* vertShaderCode = readFile("shaders/shader-vert.spv", &vertShaderSize);
-	char* fragShaderCode = readFile("shaders/shader-frag.spv", &fragShaderSize);
+	char* vertShaderCode = readFile("shaders/shader.vert.spv", &vertShaderSize);
+	char* fragShaderCode = readFile("shaders/shader.frag.spv", &fragShaderSize);
 
 	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, vertShaderSize, device);
 	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, fragShaderSize, device);

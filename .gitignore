@@ -1,8 +1,7 @@
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
 *.xcodeproj
 macOS/Generated
 macOS/Build
 macOS/Libraries
 **/.DS_STORE
+windows/.vs
+windows/out

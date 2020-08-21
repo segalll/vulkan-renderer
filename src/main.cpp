@@ -85,12 +85,22 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 	}
 }
 
+struct QueueFamilyIndex {
+    uint32_t index;
+    bool set = false;
+    
+    void setIndex(uint32_t newIndex) {
+        index = newIndex;
+        set = true;
+    }
+};
+
 struct QueueFamilyIndices {
-	int graphicsFamily = -1;
-	int presentFamily = -1;
+	QueueFamilyIndex graphicsFamily;
+    QueueFamilyIndex presentFamily;
 
 	bool isComplete() {
-		return graphicsFamily != -1 && presentFamily != -1;
+        return graphicsFamily.set && presentFamily.set;
 	}
 };
 
@@ -289,14 +299,14 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
 
 	for (uint32_t i = 0; i < queueFamilyCount; i++) {
 		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			indices.graphicsFamily = i;
+            indices.graphicsFamily.setIndex(i);
 		}
 
 		VkBool32 presentSupport = false;
 		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
 		if (presentSupport) {
-			indices.presentFamily = i;
+            indices.presentFamily.setIndex(i);
 		}
 
 		if (indices.isComplete()) {
@@ -427,9 +437,9 @@ void createSwapchain() {
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 	QueueFamilyIndices indices = findQueueFamilies(physicalDevice, surface);
-    uint32_t queueFamilyIndices[] = { static_cast<uint32_t>(indices.graphicsFamily), static_cast<uint32_t>(indices.presentFamily) };
+    uint32_t queueFamilyIndices[] = { indices.graphicsFamily.index, indices.presentFamily.index };
 
-	if (indices.graphicsFamily != indices.presentFamily) {
+    if (indices.graphicsFamily.index != indices.presentFamily.index) {
 		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 		createInfo.queueFamilyIndexCount = 2;
 		createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -491,7 +501,7 @@ void pickPhysicalDevice() {
 void createLogicalDevice() {
 	QueueFamilyIndices indices = findQueueFamilies(physicalDevice, surface);
 	
-    uint32_t uniqueQueueFamilies[2] = { static_cast<uint32_t>(indices.graphicsFamily), static_cast<uint32_t>(indices.presentFamily) };
+    uint32_t uniqueQueueFamilies[2] = { indices.graphicsFamily.index, indices.presentFamily.index };
 
 	int queueCount = 2;
 	if (uniqueQueueFamilies[0] == uniqueQueueFamilies[1]) {
@@ -529,8 +539,8 @@ void createLogicalDevice() {
 		exit(-1);
 	}
 
-	vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
-	vkGetDeviceQueue(device, indices.presentFamily, 0, &presentQueue);
+    vkGetDeviceQueue(device, indices.graphicsFamily.index, 0, &graphicsQueue);
+    vkGetDeviceQueue(device, indices.presentFamily.index, 0, &presentQueue);
 }
 
 void createImageViews() {
@@ -802,7 +812,7 @@ void createCommandPool() {
 
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.index;
 	poolInfo.flags = 0;
 
 	if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {

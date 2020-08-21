@@ -1,4 +1,9 @@
+#if defined(WIN32)
+#include <vulkan/vulkan.h>
+#elif __APPLE__
 #include <MoltenVK/mvk_vulkan.h>
+#endif
+
 #include <GLFW/glfw3.h>
 
 #include <stdlib.h>

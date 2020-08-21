@@ -53,6 +53,7 @@ endforeach(SHADER)
 add_custom_target(
 	shaders
 	DEPENDS ${SPIRV_BINARY_FILES}
+	SOURCES ${SHADER_SOURCES}
 )
 
 add_dependencies(vulkan shaders)

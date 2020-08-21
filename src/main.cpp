@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "structs.h"
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -58,8 +60,6 @@ VkFramebuffer* swapchainFramebuffers;
 
 VkRenderPass renderPass;
 VkDescriptorSetLayout descriptorSetLayout;
-VkPipelineLayout pipelineLayout;
-VkPipeline graphicsPipeline;
 
 VkCommandPool commandPool;
 
@@ -68,11 +68,7 @@ VkDeviceMemory vertexBufferMemory;
 VkBuffer indexBuffer;
 VkDeviceMemory indexBufferMemory;
 
-VkBuffer* uniformBuffers;
-VkDeviceMemory* uniformBuffersMemory;
-
 VkDescriptorPool descriptorPool;
-VkDescriptorSet* descriptorSets;
 
 VkCommandBuffer* commandBuffers;
 
@@ -83,6 +79,9 @@ VkFence* imagesInFlight;
 size_t currentFrame = 0;
 
 bool framebufferResized = false;
+
+const uint32_t objectCount = 2;
+DrawableObject objects[objectCount];
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -100,39 +99,6 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 		func(instance, debugMessenger, pAllocator);
 	}
 }
-
-struct QueueFamilyIndex {
-    uint32_t index;
-    bool set = false;
-    
-    void setIndex(uint32_t newIndex) {
-        index = newIndex;
-        set = true;
-    }
-};
-
-struct QueueFamilyIndices {
-	QueueFamilyIndex graphicsFamily;
-    QueueFamilyIndex presentFamily;
-
-	bool isComplete() {
-        return graphicsFamily.set && presentFamily.set;
-	}
-};
-
-struct SwapchainSupportDetails {
-	VkSurfaceCapabilitiesKHR capabilities;
-	VkSurfaceFormatKHR* formats;
-	int formatCount;
-	VkPresentModeKHR* presentModes;
-	int presentModeCount;
-};
-
-struct UniformBufferObject {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 projection;
-};
 
 VkVertexInputBindingDescription getVertexBindingDescription() {
 	VkVertexInputBindingDescription bindingDescription{};
@@ -691,11 +657,15 @@ void createDescriptorSetLayout() {
     }
 }
 
-void createGraphicsPipeline() {
+void createGraphicsPipeline(VkPipeline* pipeline, VkPipelineLayout* pipelineLayout, const char* shaderName) {
 	long vertShaderSize;
 	long fragShaderSize;
-	char* vertShaderCode = readFile("shaders/shader.vert.spv", &vertShaderSize);
-	char* fragShaderCode = readFile("shaders/shader.frag.spv", &fragShaderSize);
+    char vertShaderPath[50];
+    char fragShaderPath[50];
+    sprintf(vertShaderPath, "shaders/%s.vert.spv", shaderName);
+    sprintf(fragShaderPath, "shaders/%s.frag.spv", shaderName);
+	char* vertShaderCode = readFile(vertShaderPath, &vertShaderSize);
+	char* fragShaderCode = readFile(fragShaderPath, &fragShaderSize);
 
 	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, vertShaderSize, device);
 	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, fragShaderSize, device);
@@ -798,7 +768,7 @@ void createGraphicsPipeline() {
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
-	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, pipelineLayout) != VK_SUCCESS) {
 		printf("failed to create pipeline layout\n");
 		exit(-1);
 	}
@@ -813,12 +783,12 @@ void createGraphicsPipeline() {
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.layout = *pipelineLayout;
 	pipelineInfo.renderPass = renderPass;
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, pipeline) != VK_SUCCESS) {
 		printf("failed to create graphics pipeline\n");
 		exit(-1);
 	}
@@ -981,25 +951,27 @@ void createIndexBuffer() {
 
 void createUniformBuffers() {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
-    uniformBuffers = new VkBuffer[swapchainImageCount];
-    uniformBuffersMemory = new VkDeviceMemory[swapchainImageCount];
     
-    for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+    for (uint32_t i = 0; i < objectCount; i++) {
+        objects[i].uniformBuffers = new VkBuffer[swapchainImageCount];
+        objects[i].uniformBuffersMemory = new VkDeviceMemory[swapchainImageCount];
+        
+        for (uint32_t j = 0; j < swapchainImageCount; j++) {
+            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, objects[i].uniformBuffers[j], objects[i].uniformBuffersMemory[j]);
+        }
     }
 }
 
 void createDescriptorPool() {
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = swapchainImageCount;
+    poolSize.descriptorCount = objectCount * swapchainImageCount;
     
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = swapchainImageCount;
+    poolInfo.maxSets = objectCount * swapchainImageCount;
     
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         printf("failed to create descriptor pool\n");
@@ -1007,7 +979,7 @@ void createDescriptorPool() {
     }
 }
 
-void createDescriptorSets() {
+void createDescriptorSets(DrawableObject* object) {
     VkDescriptorSetLayout* layouts = new VkDescriptorSetLayout[swapchainImageCount];
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         layouts[i] = descriptorSetLayout;
@@ -1018,8 +990,8 @@ void createDescriptorSets() {
     allocInfo.descriptorSetCount = swapchainImageCount;
     allocInfo.pSetLayouts = layouts;
     
-    descriptorSets = new VkDescriptorSet[swapchainImageCount];
-    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets) != VK_SUCCESS) {
+    (*object).descriptorSets = new VkDescriptorSet[swapchainImageCount];
+    if (vkAllocateDescriptorSets(device, &allocInfo, (*object).descriptorSets) != VK_SUCCESS) {
         printf("failed to allocate descriptor sets\n");
         exit(-1);
     }
@@ -1028,13 +1000,13 @@ void createDescriptorSets() {
     
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffers[i];
+        bufferInfo.buffer = (*object).uniformBuffers[i];
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
         
         VkWriteDescriptorSet descriptorWrite{};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = descriptorSets[i];
+        descriptorWrite.dstSet = (*object).descriptorSets[i];
         descriptorWrite.dstBinding = 0;
         descriptorWrite.dstArrayElement = 0;
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1081,16 +1053,18 @@ void createCommandBuffers() {
 
 		vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        for (uint32_t j = 0; j < objectCount; j++) {
+            vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, objects[j].graphicsPipeline);
 
-		VkBuffer vertexBuffers[] = { vertexBuffer };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+            VkBuffer vertexBuffers[] = { vertexBuffer };
+            VkDeviceSize offsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-        
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-		vkCmdDrawIndexed(commandBuffers[i], sizeof(indices) / sizeof(indices[0]), 1, 0, 0, 0);
+            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, objects[j].pipelineLayout, 0, 1, &objects[j].descriptorSets[i], 0, nullptr);
+            vkCmdDrawIndexed(commandBuffers[i], sizeof(indices) / sizeof(indices[0]), 1, 0, 0, 0);
+        }
 
 		vkCmdEndRenderPass(commandBuffers[i]);
 
@@ -1137,8 +1111,12 @@ void cleanupSwapchain() {
 
 	delete[] commandBuffers;
 
-	vkDestroyPipeline(device, graphicsPipeline, nullptr);
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    for (uint32_t i = 0; i < objectCount; i++) {
+        vkDestroyPipeline(device, objects[i].graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, objects[i].pipelineLayout, nullptr);
+        delete[] objects[i].descriptorSets;
+    }
+	
 	vkDestroyRenderPass(device, renderPass, nullptr);
 
 	for (uint32_t i = 0; i < swapchainImageCount; i++) {
@@ -1149,17 +1127,17 @@ void cleanupSwapchain() {
 
 	vkDestroySwapchainKHR(device, oldSwapchain, nullptr);
     
-    for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+    for (uint32_t i = 0; i < objectCount; i++) {
+        for (uint32_t j = 0; j < swapchainImageCount; j++) {
+            vkDestroyBuffer(device, objects[i].uniformBuffers[j], nullptr);
+            vkFreeMemory(device, objects[i].uniformBuffersMemory[j], nullptr);
+        }
+        
+        delete[] objects[i].uniformBuffers;
+        delete[] objects[i].uniformBuffersMemory;
     }
     
-    delete[] uniformBuffers;
-    delete[] uniformBuffersMemory;
-    
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    
-    delete[] descriptorSets;
 }
 
 void recreateSwapchain() {
@@ -1178,30 +1156,28 @@ void recreateSwapchain() {
 	createSwapchain();
 	createImageViews();
 	createRenderPass();
-	createGraphicsPipeline();
 	createFramebuffers();
     createUniformBuffers();
     createDescriptorPool();
-    createDescriptorSets();
-	createCommandBuffers();
+    for (uint32_t i = 0; i < objectCount; i++) {
+        createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, "shader");
+        createDescriptorSets(&objects[i]);
+    }
+    createCommandBuffers();
 }
 
 void updateUniformBuffer(uint32_t currentImage) {
-    static double startTime = glfwGetTime();
-    
-    double currentTime = glfwGetTime();
-    float time = (float)currentTime - (float)startTime;
-    
-    UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f);
-    ubo.projection[1][1] *= -1;
-    
-    void* data;
-    vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-    memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+    for (uint32_t i = 0; i < objectCount; i++) {
+        objects[i].ubo.model = glm::rotate(objects[i].ubo.model, glm::radians(2.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        objects[i].ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        objects[i].ubo.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f);
+        objects[i].ubo.projection[1][1] *= -1;
+        
+        void* data;
+        vkMapMemory(device, objects[i].uniformBuffersMemory[currentImage], 0, sizeof(objects[i].ubo), 0, &data);
+        memcpy(data, &objects[i].ubo, sizeof(objects[i].ubo));
+        vkUnmapMemory(device, objects[i].uniformBuffersMemory[currentImage]);
+    }
 }
 
 void drawFrame() {
@@ -1326,6 +1302,8 @@ void cleanup() {
 }
 
 int main() {
+    objects[0].ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.5f, 0.5f, 0.0f));
+    objects[1].ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, -0.5f, 0.0f));
 	initWindow();
 	createInstance();
 	setupDebugMessenger();
@@ -1336,16 +1314,18 @@ int main() {
 	createImageViews();
 	createRenderPass();
     createDescriptorSetLayout();
-	createGraphicsPipeline();
 	createFramebuffers();
 	createCommandPool();
 	createVertexBuffer();
 	createIndexBuffer();
     createUniformBuffers();
     createDescriptorPool();
-    createDescriptorSets();
-	createCommandBuffers();
-	createSyncObjects();
+    for (uint32_t i = 0; i < objectCount; i++) {
+        createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, "shader");
+        createDescriptorSets(&objects[i]);
+    }
+    createCommandBuffers();
+    createSyncObjects();
 	drawLoop();
 	cleanup();
 }

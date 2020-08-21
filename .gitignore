@@ -2,6 +2,7 @@
 macOS/Generated
 macOS/Build
 macOS/Libraries
+macOS/DerivedData
 **/.DS_STORE
 windows/.vs
 windows/out

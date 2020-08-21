@@ -6,6 +6,10 @@
 
 #include <GLFW/glfw3.h>
 
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -46,13 +50,14 @@ VkQueue presentQueue;
 VkSwapchainKHR oldSwapchain;
 VkSwapchainKHR swapchain;
 VkImage* swapchainImages;
-int swapchainImageCount;
+uint32_t swapchainImageCount;
 VkFormat swapchainImageFormat;
 VkExtent2D swapchainExtent;
 VkImageView* swapchainImageViews;
 VkFramebuffer* swapchainFramebuffers;
 
 VkRenderPass renderPass;
+VkDescriptorSetLayout descriptorSetLayout;
 VkPipelineLayout pipelineLayout;
 VkPipeline graphicsPipeline;
 
@@ -62,6 +67,12 @@ VkBuffer vertexBuffer;
 VkDeviceMemory vertexBufferMemory;
 VkBuffer indexBuffer;
 VkDeviceMemory indexBufferMemory;
+
+VkBuffer* uniformBuffers;
+VkDeviceMemory* uniformBuffersMemory;
+
+VkDescriptorPool descriptorPool;
+VkDescriptorSet* descriptorSets;
 
 VkCommandBuffer* commandBuffers;
 
@@ -115,6 +126,12 @@ struct SwapchainSupportDetails {
 	int formatCount;
 	VkPresentModeKHR* presentModes;
 	int presentModeCount;
+};
+
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
 };
 
 VkVertexInputBindingDescription getVertexBindingDescription() {
@@ -656,6 +673,24 @@ void createRenderPass() {
 	}
 }
 
+void createDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+    
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        printf("failed to create descriptor set layout\n");
+        exit(-1);
+    }
+}
+
 void createGraphicsPipeline() {
 	long vertShaderSize;
 	long fragShaderSize;
@@ -722,7 +757,7 @@ void createGraphicsPipeline() {
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 	rasterizer.depthBiasConstantFactor = 0.0f;
 	rasterizer.depthBiasClamp = 0.0f;
@@ -760,8 +795,8 @@ void createGraphicsPipeline() {
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 		printf("failed to create pipeline layout\n");
@@ -944,6 +979,72 @@ void createIndexBuffer() {
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void createUniformBuffers() {
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    uniformBuffers = new VkBuffer[swapchainImageCount];
+    uniformBuffersMemory = new VkDeviceMemory[swapchainImageCount];
+    
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+    }
+}
+
+void createDescriptorPool() {
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = swapchainImageCount;
+    
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = swapchainImageCount;
+    
+    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        printf("failed to create descriptor pool\n");
+        exit(-1);
+    }
+}
+
+void createDescriptorSets() {
+    VkDescriptorSetLayout* layouts = new VkDescriptorSetLayout[swapchainImageCount];
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        layouts[i] = descriptorSetLayout;
+    }
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = swapchainImageCount;
+    allocInfo.pSetLayouts = layouts;
+    
+    descriptorSets = new VkDescriptorSet[swapchainImageCount];
+    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets) != VK_SUCCESS) {
+        printf("failed to allocate descriptor sets\n");
+        exit(-1);
+    }
+    
+    delete[] layouts;
+    
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = uniformBuffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(UniformBufferObject);
+        
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = descriptorSets[i];
+        descriptorWrite.dstBinding = 0;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+        
+        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+    }
+}
+
 void createCommandBuffers() {
 	commandBuffers = new VkCommandBuffer[swapchainImageCount];
 
@@ -951,7 +1052,7 @@ void createCommandBuffers() {
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = commandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = (uint32_t)swapchainImageCount;
+	allocInfo.commandBufferCount = swapchainImageCount;
 
 	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers) != VK_SUCCESS) {
 		printf("failed to allocate command buffers\n");
@@ -987,7 +1088,8 @@ void createCommandBuffers() {
 		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
 		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-
+        
+        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
 		vkCmdDrawIndexed(commandBuffers[i], sizeof(indices) / sizeof(indices[0]), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffers[i]);
@@ -1046,6 +1148,18 @@ void cleanupSwapchain() {
 	delete[] swapchainImageViews;
 
 	vkDestroySwapchainKHR(device, oldSwapchain, nullptr);
+    
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+    }
+    
+    delete[] uniformBuffers;
+    delete[] uniformBuffersMemory;
+    
+    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    
+    delete[] descriptorSets;
 }
 
 void recreateSwapchain() {
@@ -1066,7 +1180,28 @@ void recreateSwapchain() {
 	createRenderPass();
 	createGraphicsPipeline();
 	createFramebuffers();
+    createUniformBuffers();
+    createDescriptorPool();
+    createDescriptorSets();
 	createCommandBuffers();
+}
+
+void updateUniformBuffer(uint32_t currentImage) {
+    static double startTime = glfwGetTime();
+    
+    double currentTime = glfwGetTime();
+    float time = (float)currentTime - (float)startTime;
+    
+    UniformBufferObject ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f);
+    ubo.projection[1][1] *= -1;
+    
+    void* data;
+    vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 }
 
 void drawFrame() {
@@ -1082,6 +1217,8 @@ void drawFrame() {
 		printf("failed to acquire swapchain image\n");
 		exit(-1);
 	}
+    
+    updateUniformBuffer(imageIndex);
 
 	if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
 		vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -1150,6 +1287,8 @@ void drawLoop() {
 
 void cleanup() {
 	cleanupSwapchain();
+    
+    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
 	vkDestroyBuffer(device, indexBuffer, nullptr);
 	vkFreeMemory(device, indexBufferMemory, nullptr);
@@ -1196,11 +1335,15 @@ int main() {
 	createSwapchain();
 	createImageViews();
 	createRenderPass();
+    createDescriptorSetLayout();
 	createGraphicsPipeline();
 	createFramebuffers();
 	createCommandPool();
 	createVertexBuffer();
 	createIndexBuffer();
+    createUniformBuffers();
+    createDescriptorPool();
+    createDescriptorSets();
 	createCommandBuffers();
 	createSyncObjects();
 	drawLoop();

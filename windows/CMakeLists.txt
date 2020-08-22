@@ -4,6 +4,7 @@ project(vulkan)
 
 set(VULKAN_SDK_DIR "C:/VulkanSDK/1.2.141.2")
 set(GLFW_DIR "A:/Coding/glfw")
+set(GLM_DIR "A:/Coding/glm")
 set(MAIN_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/out)
 
@@ -12,6 +13,7 @@ set(LIB_GLFW ${GLFW_DIR}/lib/glfw3.lib)
 
 include_directories(${VULKAN_SDK_DIR}/Include)
 include_directories(${GLFW_DIR}/include)
+include_directories(${GLM_DIR}/include)
 
 file(GLOB_RECURSE CPP_HEADERS ${MAIN_SOURCE_DIR}/*.h)
 file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/*.cpp)

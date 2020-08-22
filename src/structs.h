@@ -44,6 +44,7 @@ struct DrawableObject {
     VkBuffer* uniformBuffers;
     VkDeviceMemory* uniformBuffersMemory;
     UniformBufferObject ubo;
+    char* shader;
 };
 
 #endif /* structs_h */

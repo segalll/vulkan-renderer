@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "structs.h"
+#include "hashtable.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -83,6 +84,8 @@ bool framebufferResized = false;
 const uint32_t objectCount = 2;
 DrawableObject objects[objectCount];
 
+HashTable* objectShaders = create_table(objectCount);
+
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 	if (func != nullptr) {
@@ -141,8 +144,6 @@ const uint16_t indices[] = {
 bool checkValidationLayerSupport() {
 	uint32_t layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-    
-    printf("%u\n", layerCount);
 
 	VkLayerProperties* availableLayers = new VkLayerProperties[layerCount];
 	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
@@ -151,7 +152,6 @@ bool checkValidationLayerSupport() {
 		bool layerFound = false;
 
 		for (uint32_t i = 0; i < layerCount; i++) {
-            printf("%s\n", availableLayers[i].layerName);
 			if (strcmp(layerName, availableLayers[i].layerName) == 0) {
 				layerFound = true;
 				break;
@@ -1055,7 +1055,6 @@ void createCommandBuffers() {
 
         for (uint32_t j = 0; j < objectCount; j++) {
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, objects[j].graphicsPipeline);
-
             VkBuffer vertexBuffers[] = { vertexBuffer };
             VkDeviceSize offsets[] = { 0 };
             vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
@@ -1112,8 +1111,10 @@ void cleanupSwapchain() {
 	delete[] commandBuffers;
 
     for (uint32_t i = 0; i < objectCount; i++) {
-        vkDestroyPipeline(device, objects[i].graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, objects[i].pipelineLayout, nullptr);
+		if (i != 0 && objects[i - 1].shader != objects[i].shader) {
+			vkDestroyPipeline(device, objects[i].graphicsPipeline, nullptr);
+			vkDestroyPipelineLayout(device, objects[i].pipelineLayout, nullptr);
+		}
         delete[] objects[i].descriptorSets;
     }
 	
@@ -1140,6 +1141,45 @@ void cleanupSwapchain() {
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 }
 
+void createObject(DrawableObject* object, glm::vec2 pos, char* shader) {
+	object->ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0.0f));
+	object->shader = shader;
+}
+
+void setupObjectShaderMap() {
+	for (uint32_t i = 0; i < objectCount; i++) {
+		int foundElem = ht_search(objectShaders, objects[i].shader);
+		if (foundElem != NULL) {
+			DrawableObject temp = objects[foundElem];
+			objects[foundElem] = objects[i];
+			objects[i] = temp;
+		}
+		ht_insert(objectShaders, objects[i].shader, i);
+	}
+}
+
+void setupObjects() {
+	for (uint32_t i = 0; i < objectCount; i++) {
+		int foundIndex = ht_search(objectShaders, objects[i].shader);
+		if (foundIndex >= i) {
+			if (i == 0) {
+				createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, objects[i].shader);
+			}
+			else if (strcmp(objects[i - 1].shader, objects[i].shader) != 0) {
+				createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, objects[i].shader);
+			}
+			else {
+				objects[i].graphicsPipeline = objects[i - 1].graphicsPipeline;
+				objects[i].pipelineLayout = objects[i - 1].pipelineLayout;
+			}
+		}
+		else {
+			createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, objects[i].shader);
+		}
+		createDescriptorSets(&objects[i]);
+	}
+}
+
 void recreateSwapchain() {
 	int width = 0;
 	int height = 0;
@@ -1159,10 +1199,7 @@ void recreateSwapchain() {
 	createFramebuffers();
     createUniformBuffers();
     createDescriptorPool();
-    for (uint32_t i = 0; i < objectCount; i++) {
-        createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, "shader");
-        createDescriptorSets(&objects[i]);
-    }
+	setupObjects();
     createCommandBuffers();
 }
 
@@ -1296,14 +1333,14 @@ void cleanup() {
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 
+	free_hashtable(objectShaders);
+
 	glfwDestroyWindow(window);
 
 	glfwTerminate();
 }
 
 int main() {
-    objects[0].ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.5f, 0.5f, 0.0f));
-    objects[1].ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, -0.5f, 0.0f));
 	initWindow();
 	createInstance();
 	setupDebugMessenger();
@@ -1320,12 +1357,12 @@ int main() {
 	createIndexBuffer();
     createUniformBuffers();
     createDescriptorPool();
-    for (uint32_t i = 0; i < objectCount; i++) {
-        createGraphicsPipeline(&objects[i].graphicsPipeline, &objects[i].pipelineLayout, "shader");
-        createDescriptorSets(&objects[i]);
-    }
-    createCommandBuffers();
-    createSyncObjects();
+	createObject(&objects[0], glm::vec2(-0.5f, 0.5f), "shader");
+	createObject(&objects[1], glm::vec2(0.5f, -0.5f), "shader");
+	setupObjectShaderMap();
+	setupObjects();
+	createCommandBuffers();
+	createSyncObjects();
 	drawLoop();
 	cleanup();
 }

@@ -41,26 +41,6 @@ static LinkedList* linkedlist_insert(LinkedList* list, ht_item* item) {
     return list;
 }
 
-static ht_item* linkedlist_remove(LinkedList* list) {
-    if (!list) {
-        return NULL;
-    }
-    if (!list->next) {
-        return NULL;
-    }
-
-    LinkedList* node = list->next;
-    LinkedList* temp = list;
-    temp->next = NULL;
-    list = node;
-    ht_item* it = NULL;
-    memcpy(temp->item, it, sizeof(ht_item));
-    free(temp->item->key);
-    free(temp->item);
-    free(temp);
-    return it;
-}
-
 static void free_linkedlist(LinkedList* list) {
     LinkedList* temp = list;
     if (!list) {
@@ -147,7 +127,7 @@ void handle_collision(HashTable* table, unsigned long index, ht_item* item) {
 void ht_insert(HashTable* table, char* key, int value) {
     ht_item* item = create_item(key, value);
 
-    int index = hash_function(key, table->size);
+    unsigned long index = hash_function(key, table->size);
 
     ht_item* current_item = table->items[index];
 
@@ -173,7 +153,7 @@ void ht_insert(HashTable* table, char* key, int value) {
 }
 
 int ht_search(HashTable* table, char* key) {
-    int index = hash_function(key, table->size);
+    unsigned long index = hash_function(key, table->size);
     ht_item* item = table->items[index];
     LinkedList* head = table->overflow_buckets[index];
 

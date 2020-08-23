@@ -25,7 +25,6 @@ struct HashTable {
 unsigned long hash_function(char* str, int size);
 static LinkedList* allocate_list();
 static LinkedList* linkedlist_insert(LinkedList* list, ht_item* item);
-static ht_item* linkedlist_remove(LinkedList* list);
 static void free_linkedlist(LinkedList* list);
 static LinkedList** create_overflow_buckets(HashTable* table);
 static void free_overflow_buckets(HashTable* table);

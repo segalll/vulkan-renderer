@@ -337,7 +337,7 @@ SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice physicalDevice, V
 	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
 
 	if (formatCount != 0) {
-		details.formats = (VkSurfaceFormatKHR*)malloc(formatCount * sizeof(VkSurfaceFormatKHR));
+		details.formats = new VkSurfaceFormatKHR[formatCount];
 		details.formatCount = formatCount;
 		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, details.formats);
 	}
@@ -346,7 +346,7 @@ SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice physicalDevice, V
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
 
 	if (presentModeCount != 0) {
-		details.presentModes = (VkPresentModeKHR*)malloc(presentModeCount * sizeof(VkPresentModeKHR));
+		details.presentModes = new VkPresentModeKHR[presentModeCount];
 		details.presentModeCount = presentModeCount;
 		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, details.presentModes);
 	}
@@ -1109,9 +1109,9 @@ void cleanupSwapchain() {
 	vkFreeCommandBuffers(device, commandPool, swapchainImageCount, commandBuffers);
 
 	delete[] commandBuffers;
-
+    
     for (uint32_t i = 0; i < objectCount; i++) {
-		if (i != 0 && objects[i - 1].shader != objects[i].shader) {
+		if (i == 0 || objects[i - 1].shader != objects[i].shader) {
 			vkDestroyPipeline(device, objects[i].graphicsPipeline, nullptr);
 			vkDestroyPipelineLayout(device, objects[i].pipelineLayout, nullptr);
 		}

@@ -5,25 +5,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct ht_item {
+typedef struct {
     char* key;
     int value;
-};
+} ht_item;
 
-struct LinkedList {
+typedef struct LinkedList {
     ht_item* item;
-    LinkedList* next;
-};
+    struct LinkedList* next;
+} LinkedList;
 
-struct HashTable {
+typedef struct {
     ht_item** items;
     LinkedList** overflow_buckets;
     int size;
     int count;
-};
+} HashTable;
 
 unsigned long hash_function(char* str, int size);
-static LinkedList* allocate_list();
+static LinkedList* allocate_list(void);
 static LinkedList* linkedlist_insert(LinkedList* list, ht_item* item);
 static void free_linkedlist(LinkedList* list);
 static LinkedList** create_overflow_buckets(HashTable* table);

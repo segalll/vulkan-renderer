@@ -28,10 +28,7 @@ options:
     tabWidth: 4
 
 settings:
-    CLANG_CXX_LANGUAGE_STANDARD: c++17
-    CLANG_CXX_LIBRARY: libc++
     GCC_C_LANGUAGE_STANDARD: c11
-    CLANG_WARN_DOCUMENTATION_COMMENTS: false
 
 targets:
     test:
@@ -48,10 +45,11 @@ targets:
             HEADER_SEARCH_PATHS:
                 - $(PROJECT_DIR)/Libraries/vulkansdk/MoltenVK/include
                 - $(PROJECT_DIR)/Libraries/glfw/include
-                - $(PROJECT_DIR)/Libraries/glm/include
+                - $(PROJECT_DIR)/Libraries/cglm/include
             LIBRARY_SEARCH_PATHS:
-                - $(PROJECT_DIR)/Libraries/glfw/lib
                 - $(PROJECT_DIR)/Libraries/vulkansdk/macOS/lib
+                - $(PROJECT_DIR)/Libraries/glfw/lib
+                - $(PROJECT_DIR)/Libraries/cglm/lib
         dependencies:
             - framework: $(PROJECT_DIR)/Libraries/vulkansdk/macOS/lib/libvulkan.1.dylib
             - sdk: Metal.framework
@@ -61,6 +59,8 @@ targets:
               embed: false
             - sdk: Cocoa.framework
             - sdk: IOKit.framework
+            - framework: $(PROJECT_DIR)/Libraries/cglm/lib/libcglm.a
+              embed: false
         buildRules:
             - filePattern: "*.frag *.vert"
               script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_NAME.spv

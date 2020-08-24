@@ -9,7 +9,7 @@ unsigned long hash_function(char* str, int size) {
 }
 
 static LinkedList* allocate_list() {
-    LinkedList* list = (LinkedList*)calloc(1, sizeof(LinkedList));
+    LinkedList* list = calloc(1, sizeof(LinkedList));
     return list;
 }
 
@@ -56,7 +56,7 @@ static void free_linkedlist(LinkedList* list) {
 }
 
 static LinkedList** create_overflow_buckets(HashTable* table) {
-    LinkedList** buckets = (LinkedList**)calloc(table->size, sizeof(LinkedList*));
+    LinkedList** buckets = calloc(table->size, sizeof(LinkedList*));
     for (int i = 0; i < table->size; i++)
         buckets[i] = NULL;
     return buckets;
@@ -71,8 +71,8 @@ static void free_overflow_buckets(HashTable* table) {
 
 
 ht_item* create_item(char* key, int value) {
-    ht_item* item = (ht_item*)malloc(sizeof(ht_item));
-    item->key = (char*)calloc(strlen(key) + 1, sizeof(char));
+    ht_item* item = malloc(sizeof(ht_item));
+    item->key = calloc(strlen(key) + 1, sizeof(char));
 
     strcpy(item->key, key);
     item->value = value;
@@ -81,14 +81,13 @@ ht_item* create_item(char* key, int value) {
 }
 
 HashTable* create_table(int size) {
-    HashTable* table = (HashTable*)malloc(sizeof(HashTable));
+    HashTable* table = malloc(sizeof(HashTable));
     table->size = size;
     table->count = 0;
-    table->items = (ht_item**)calloc(table->size, sizeof(ht_item*));
+    table->items = calloc(table->size, sizeof(ht_item*));
     for (int i = 0; i < table->size; i++)
         table->items[i] = NULL;
     table->overflow_buckets = create_overflow_buckets(table);
-
     return table;
 }
 
@@ -117,8 +116,7 @@ void handle_collision(HashTable* table, unsigned long index, ht_item* item) {
         head->item = item;
         table->overflow_buckets[index] = head;
         return;
-    }
-    else {
+    } else {
         table->overflow_buckets[index] = linkedlist_insert(head, item);
         return;
     }
@@ -161,9 +159,9 @@ int ht_search(HashTable* table, char* key) {
         if (strcmp(item->key, key) == 0)
             return item->value;
         if (head == NULL)
-            return NULL;
+            return -1;
         item = head->item;
         head = head->next;
     }
-    return NULL;
+    return -1;
 }

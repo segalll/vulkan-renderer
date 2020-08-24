@@ -2,42 +2,37 @@
 #define structs_h
 
 #include <vulkan/vulkan.h>
-#include <glm/glm.hpp>
+#include <cglm/cglm.h>
 
-struct QueueFamilyIndex {
+typedef struct QueueFamilyIndex {
     uint32_t index;
-    bool set = false;
-    
-    void setIndex(uint32_t newIndex) {
-        index = newIndex;
-        set = true;
-    }
-};
+    bool set;
+} QueueFamilyIndex;
 
-struct QueueFamilyIndices {
+void setQueueFamilyIndex(QueueFamilyIndex* qfi, uint32_t newIndex);
+
+typedef struct QueueFamilyIndices {
     QueueFamilyIndex graphicsFamily;
     QueueFamilyIndex presentFamily;
+} QueueFamilyIndices;
 
-    bool isComplete() {
-        return graphicsFamily.set && presentFamily.set;
-    }
-};
+bool queueFamilyIndicesAreComplete(QueueFamilyIndices indices);
 
-struct SwapchainSupportDetails {
+typedef struct SwapchainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     VkSurfaceFormatKHR* formats;
     int formatCount;
     VkPresentModeKHR* presentModes;
     int presentModeCount;
-};
+} SwapchainSupportDetails;
 
-struct UniformBufferObject {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 projection;
-};
+typedef struct UniformBufferObject {
+    CGLM_ALIGN(16) mat4 model;
+    CGLM_ALIGN(16) mat4 view;
+    CGLM_ALIGN(16) mat4 projection;
+} UniformBufferObject;
 
-struct DrawableObject {
+typedef struct DrawableObject {
     VkPipeline graphicsPipeline;
     VkPipelineLayout pipelineLayout;
     VkDescriptorSet* descriptorSets;
@@ -45,6 +40,6 @@ struct DrawableObject {
     VkDeviceMemory* uniformBuffersMemory;
     UniformBufferObject ubo;
     char* shader;
-};
+} DrawableObject;
 
 #endif /* structs_h */

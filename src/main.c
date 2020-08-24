@@ -1,15 +1,15 @@
 #if defined(WIN32)
 #include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 #elif __APPLE__
 #include <MoltenVK/mvk_vulkan.h>
-#endif
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
 
 #include <GLFW/glfw3.h>
 
 #pragma clang diagnostic pop
+#endif
 
 #include <cglm/cglm.h>
 
@@ -24,14 +24,14 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 const uint32_t validationLayersCount = 1;
-const char* validationLayers[validationLayersCount] = {
+const char** validationLayers[1] = {
     "VK_LAYER_KHRONOS_validation"
 };
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const uint32_t deviceExtensionsCount = 1;
-const char* deviceExtensions[deviceExtensionsCount] = {
+const char* deviceExtensions[1] = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
@@ -85,7 +85,7 @@ size_t currentFrame = 0;
 bool framebufferResized = false;
 
 const uint32_t objectCount = 2;
-DrawableObject objects[objectCount];
+DrawableObject objects[2];
 
 HashTable* objectShaders;
 
@@ -119,6 +119,10 @@ VkVertexInputAttributeDescription* getVertexAttributeDescriptions(int* attribute
     *attributeDescriptionCount = 2;
 
     VkVertexInputAttributeDescription* attributeDescriptions = malloc(2 * sizeof(VkVertexInputAttributeDescription));
+    if (attributeDescriptions == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
 
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
@@ -148,7 +152,11 @@ bool checkValidationLayerSupport() {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, NULL);
 
-    VkLayerProperties availableLayers[layerCount];
+    VkLayerProperties* availableLayers = malloc(layerCount * sizeof(VkLayerProperties));
+    if (availableLayers == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
 
     for (uint32_t i = 0; i < validationLayersCount; i++) {
@@ -162,10 +170,12 @@ bool checkValidationLayerSupport() {
         }
 
         if (!layerFound) {
+            free(availableLayers);
             return false;
         }
     }
 
+    free(availableLayers);
     return true;
 }
 
@@ -202,6 +212,10 @@ const char** getRequiredExtensions(uint32_t* extensionCount) {
 
     if (enableValidationLayers) {
         const char** tempExtensions = malloc((glfwExtensionCount + 1) * sizeof(const char*));
+        if (tempExtensions == NULL) {
+            printf("ran out of memory\n");
+            exit(-1);
+        }
         for (uint32_t i = 0; i < glfwExtensionCount; i++) {
             tempExtensions[i] = extensions[i];
         }
@@ -219,7 +233,7 @@ void createInstance() {
         exit(-1);
     }
 
-    VkApplicationInfo appInfo;
+    VkApplicationInfo appInfo = (VkApplicationInfo){ 0 };
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "vulkan";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -227,7 +241,7 @@ void createInstance() {
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
 
-    VkInstanceCreateInfo createInfo;
+    VkInstanceCreateInfo createInfo = (VkInstanceCreateInfo){ 0 };
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
@@ -254,6 +268,10 @@ void createInstance() {
     if (vkCreateInstance(&createInfo, NULL, &instance) != VK_SUCCESS) {
         printf("failed to create instance\n");
         exit(-1);
+    }
+
+    if (enableValidationLayers) {
+        free(extensions);
     }
 }
 
@@ -285,7 +303,11 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, NULL);
 
-    VkQueueFamilyProperties queueFamilies[queueFamilyCount];
+    VkQueueFamilyProperties* queueFamilies = malloc(queueFamilyCount * sizeof(VkQueueFamilyProperties));
+    if (queueFamilies == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies);
 
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
@@ -305,6 +327,8 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
         }
     }
 
+    free(queueFamilies);
+
     return indices;
 }
 
@@ -312,7 +336,11 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, NULL);
 
-    VkExtensionProperties availableExtensions[extensionCount];
+    VkExtensionProperties* availableExtensions = malloc(extensionCount * sizeof(VkExtensionProperties));
+    if (availableExtensions == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     vkEnumerateDeviceExtensionProperties(device, NULL, &extensionCount, availableExtensions);
     
     uint32_t found = 0;
@@ -328,6 +356,8 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
         }
     }
 
+    free(availableExtensions);
+
     return false;
 }
 
@@ -340,8 +370,11 @@ SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice physicalDevice, V
     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, NULL);
 
     if (formatCount != 0) {
-        VkSurfaceFormatKHR* formats = malloc(formatCount * sizeof(VkSurfaceFormatKHR));
-        details.formats = formats;
+        details.formats = malloc(formatCount * sizeof(VkSurfaceFormatKHR));
+        if (details.formats == NULL) {
+            printf("ran out of memory\n");
+            exit(-1);
+        }
         details.formatCount = formatCount;
         vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, details.formats);
     }
@@ -350,8 +383,11 @@ SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice physicalDevice, V
     vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, NULL);
 
     if (presentModeCount != 0) {
-        VkPresentModeKHR* presentModes = malloc(presentModeCount * sizeof(VkPresentModeKHR));
-        details.presentModes = presentModes;
+        details.presentModes = malloc(presentModeCount * sizeof(VkPresentModeKHR));
+        if (details.presentModes == NULL) {
+            printf("ran out of memory\n");
+            exit(-1);
+        }
         details.presentModeCount = presentModeCount;
         vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, details.presentModes);
     }
@@ -368,6 +404,8 @@ bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
     if (extensionsSupported) {
         SwapchainSupportDetails swapchainSupport = querySwapchainSupport(device, surface);
         swapchainAdequate = swapchainSupport.formatCount != 0 && swapchainSupport.presentModeCount != 0;
+        free(swapchainSupport.formats);
+        free(swapchainSupport.presentModes);
     }
 
     return queueFamilyIndicesAreComplete(indices) && extensionsSupported && swapchainAdequate;
@@ -460,8 +498,15 @@ void createSwapchain() {
         exit(-1);
     }
 
+    free(swapchainSupport.formats);
+    free(swapchainSupport.presentModes);
+
     vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL);
     swapchainImages = malloc(imageCount * sizeof(VkImage));
+    if (swapchainImages == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     swapchainImageCount = imageCount;
     vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages);
 
@@ -478,7 +523,11 @@ void pickPhysicalDevice() {
         exit(-1);
     }
 
-    VkPhysicalDevice devices[deviceCount];
+    VkPhysicalDevice* devices = malloc(deviceCount * sizeof(VkPhysicalDevice));
+    if (devices == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices);
 
     for (uint32_t i = 0; i < deviceCount; i++) {
@@ -487,6 +536,8 @@ void pickPhysicalDevice() {
             break;
         }
     }
+
+    free(devices);
 
     if (physicalDevice == VK_NULL_HANDLE) {
         printf("failed to find a suitable GPU\n");
@@ -504,7 +555,11 @@ void createLogicalDevice() {
         queueCount = 1;
     }
 
-    VkDeviceQueueCreateInfo queueCreateInfos[queueCount];
+    VkDeviceQueueCreateInfo* queueCreateInfos = malloc(queueCount * sizeof(VkDeviceQueueCreateInfo));
+    if (queueCreateInfos == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
 
     float queuePriority = 1.0f;
 
@@ -535,12 +590,18 @@ void createLogicalDevice() {
         exit(-1);
     }
 
+    free(queueCreateInfos);
+
     vkGetDeviceQueue(device, indices.graphicsFamily.index, 0, &graphicsQueue);
     vkGetDeviceQueue(device, indices.presentFamily.index, 0, &presentQueue);
 }
 
 void createImageViews() {
     swapchainImageViews = malloc(swapchainImageCount * sizeof(VkImageView));
+    if (swapchainImageViews == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
 
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         VkImageViewCreateInfo createInfo = (VkImageViewCreateInfo){ 0 };
@@ -575,6 +636,10 @@ static char* readFile(const char* filename, long* filesize) {
     long sz = ftell(fp);
     rewind(fp);
     char* buffer = malloc(sz * sizeof(char));
+    if (buffer == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     fread(buffer, sizeof(char), sz / sizeof(char), fp);
 
     fclose(fp);
@@ -672,6 +737,9 @@ void createGraphicsPipeline(VkPipeline* pipeline, VkPipelineLayout* pipelineLayo
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, vertShaderSize, device);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, fragShaderSize, device);
+
+    free(vertShaderCode);
+    free(fragShaderCode);
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = (VkPipelineShaderStageCreateInfo){ 0 };
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -797,12 +865,18 @@ void createGraphicsPipeline(VkPipeline* pipeline, VkPipelineLayout* pipelineLayo
         exit(-1);
     }
 
+    free(attributeDescriptions);
+
     vkDestroyShaderModule(device, vertShaderModule, NULL);
     vkDestroyShaderModule(device, fragShaderModule, NULL);
 }
 
 void createFramebuffers() {
     swapchainFramebuffers = malloc(swapchainImageCount * sizeof(VkFramebuffer));
+    if (swapchainFramebuffers == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         VkImageView attachments[] = {
             swapchainImageViews[i]
@@ -957,6 +1031,10 @@ void createUniformBuffers() {
     for (uint32_t i = 0; i < objectCount; i++) {
         objects[i].uniformBuffers = malloc(swapchainImageCount * sizeof(VkBuffer));
         objects[i].uniformBuffersMemory = malloc(swapchainImageCount * sizeof(VkDeviceMemory));
+        if (objects[i].uniformBuffers == NULL || objects[i].uniformBuffersMemory == NULL) {
+            printf("ran out of memory\n");
+            exit(-1);
+        }
         
         for (uint32_t j = 0; j < swapchainImageCount; j++) {
             createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &objects[i].uniformBuffers[j], &objects[i].uniformBuffersMemory[j]);
@@ -982,7 +1060,11 @@ void createDescriptorPool() {
 }
 
 void createDescriptorSets(DrawableObject* object) {
-    VkDescriptorSetLayout layouts[swapchainImageCount];
+    VkDescriptorSetLayout* layouts = malloc(swapchainImageCount * sizeof(VkDescriptorSetLayout));
+    if (layouts == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         layouts[i] = descriptorSetLayout;
     }
@@ -993,10 +1075,16 @@ void createDescriptorSets(DrawableObject* object) {
     allocInfo.pSetLayouts = layouts;
     
     object->descriptorSets = malloc(swapchainImageCount * sizeof(VkDescriptorSet));
+    if (object->descriptorSets == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
     if (vkAllocateDescriptorSets(device, &allocInfo, object->descriptorSets) != VK_SUCCESS) {
         printf("failed to allocate descriptor sets\n");
         exit(-1);
     }
+
+    free(layouts);
     
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         VkDescriptorBufferInfo bufferInfo = (VkDescriptorBufferInfo){ 0 };
@@ -1006,7 +1094,7 @@ void createDescriptorSets(DrawableObject* object) {
         
         VkWriteDescriptorSet descriptorWrite = (VkWriteDescriptorSet){ 0 };
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = (*object).descriptorSets[i];
+        descriptorWrite.dstSet = object->descriptorSets[i];
         descriptorWrite.dstBinding = 0;
         descriptorWrite.dstArrayElement = 0;
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1019,6 +1107,10 @@ void createDescriptorSets(DrawableObject* object) {
 
 void createCommandBuffers() {
     commandBuffers = malloc(swapchainImageCount * sizeof(VkCommandBuffer));
+    if (commandBuffers == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
 
     VkCommandBufferAllocateInfo allocInfo = (VkCommandBufferAllocateInfo){ 0 };
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1080,6 +1172,10 @@ void createSyncObjects() {
     renderFinishedSemaphores = malloc(MAX_FRAMES_IN_FLIGHT * sizeof(VkSemaphore));
     inFlightFences = malloc(MAX_FRAMES_IN_FLIGHT * sizeof(VkFence));
     imagesInFlight = malloc(swapchainImageCount * sizeof(VkFence));
+    if (imageAvailableSemaphores == NULL || renderFinishedSemaphores == NULL || inFlightFences == NULL || imagesInFlight == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
 
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         imagesInFlight[i] = VK_NULL_HANDLE;
@@ -1146,7 +1242,7 @@ void cleanupSwapchain() {
     free(commandBuffers);
     
     for (uint32_t i = 0; i < objectCount; i++) {
-        if (i == 0 || objects[i - 1].shader != objects[i].shader) {
+        if (i == 0 || strcmp(objects[i - 1].shader, objects[i].shader) != 0) {
             vkDestroyPipeline(device, objects[i].graphicsPipeline, NULL);
             vkDestroyPipelineLayout(device, objects[i].pipelineLayout, NULL);
         }
@@ -1159,6 +1255,7 @@ void cleanupSwapchain() {
     }
 
     free(swapchainImageViews);
+    free(swapchainImages);
 
     vkDestroySwapchainKHR(device, oldSwapchain, NULL);
     
@@ -1170,6 +1267,7 @@ void cleanupSwapchain() {
         
         free(objects[i].uniformBuffers);
         free(objects[i].uniformBuffersMemory);
+        free(objects[i].descriptorSets);
     }
     
     vkDestroyDescriptorPool(device, descriptorPool, NULL);

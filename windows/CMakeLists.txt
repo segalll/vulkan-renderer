@@ -67,3 +67,10 @@ add_custom_command(TARGET vulkan POST_BUILD
 		"${PROJECT_BINARY_DIR}/shaders"
 		"$<TARGET_FILE_DIR:vulkan>/shaders"
 )
+
+add_custom_command(TARGET vulkan POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:vulkan>/fonts/"
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+		"${CMAKE_CURRENT_SOURCE_DIR}/../res/fonts"
+		"$<TARGET_FILE_DIR:vulkan>/fonts"
+)

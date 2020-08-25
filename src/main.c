@@ -633,8 +633,12 @@ void createImageViews() {
 }
 
 static char* readFile(const char* filename, long* filesize) {
-    FILE* fp;
-    fp = fopen(filename, "rb");
+    FILE* fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        printf("failed to open file\n");
+        exit(-1);
+    }
+
     fseek(fp, 0L, SEEK_END);
     long sz = ftell(fp);
     rewind(fp);
@@ -1276,70 +1280,107 @@ void cleanupSwapchain() {
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
 }
 
-void writeBMCharsToBin(char* in_file, char* out_file) {
+void writeBMCharsToBin(char* in_file, char* out_file, bmchar* out_arr, size_t out_arr_size) {
     FILE* fp = fopen(in_file, "r");
-    char* line_buf = NULL;
-    size_t line_buf_size = 0;
-    size_t line_size;
-    
-    line_size = getline(&line_buf, &line_buf_size, fp);
-    
+    if (fp == NULL) {
+        printf("failed to open file\n");
+        exit(-1);
+    }
+
+    char chunk[128];
+
+    size_t len = sizeof(chunk);
+    char* line = malloc(len);
+    if (line == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
+
+    line[0] = '\0';
+
     bool foundChar = false;
-    
-    while (line_size >= 0) {
-        char* token = strtok(line_buf, " ");
-        if (strcmp(token, "char") == 0) {
-            if (!foundChar) foundChar = true;
-            token = strtok(NULL, " id=");
-            int charid = atoi(token);
-            token = strtok(NULL, " x=");
-            fontChars[charid].x = atoi(token);
-            token = strtok(NULL, " y=");
-            fontChars[charid].y = atoi(token);
-            token = strtok(NULL, " width=");
-            fontChars[charid].width = atoi(token);
-            token = strtok(NULL, " height=");
-            fontChars[charid].height = atoi(token);
-            token = strtok(NULL, " xoffset=");
-            fontChars[charid].xoffset = atoi(token);
-            token = strtok(NULL, " yoffset=");
-            fontChars[charid].yoffset = atoi(token);
-            token = strtok(NULL, " xadvance=");
-            fontChars[charid].xadvance = atoi(token);
-            token = strtok(NULL, " page=");
-            fontChars[charid].page = atoi(token);
-            printf("%d parsed\n", charid);
-        } else {
-            if (foundChar) break;
+
+    while (fgets(chunk, sizeof(chunk), fp) != NULL) {
+        size_t len_used = strlen(line);
+        size_t chunk_used = strlen(chunk);
+
+        if (len - len_used < chunk_used) {
+            len *= 2;
+            if ((line = realloc(line, len)) == NULL) {
+                printf("failed to reallocate memory\n");
+                free(line);
+                exit(1);
+            }
         }
-        
-        line_size = getline(&line_buf, &line_buf_size, fp);
+
+        strncpy(line + len_used, chunk, len - len_used);
+        len_used += chunk_used;
+
+        if (line[len_used - 1] == '\n') {
+            char* token = strtok(line, " ");
+            if (strcmp(token, "char") == 0) {
+                if (!foundChar) foundChar = true;
+                token = strtok(NULL, " id=");
+                int charid = atoi(token);
+                token = strtok(NULL, " x=");
+                out_arr[charid].x = atoi(token);
+                token = strtok(NULL, " y=");
+                out_arr[charid].y = atoi(token);
+                token = strtok(NULL, " width=");
+                out_arr[charid].width = atoi(token);
+                token = strtok(NULL, " height=");
+                out_arr[charid].height = atoi(token);
+                token = strtok(NULL, " xoffset=");
+                out_arr[charid].xoffset = atoi(token);
+                token = strtok(NULL, " yoffset=");
+                out_arr[charid].yoffset = atoi(token);
+                token = strtok(NULL, " xadvance=");
+                out_arr[charid].xadvance = atoi(token);
+                token = strtok(NULL, " page=");
+                out_arr[charid].page = atoi(token);
+            } else {
+                if (foundChar) break;
+            }
+            line[0] = '\0';
+        }
     }
     
-    free(line_buf);
+    free(line);
     fclose(fp);
     
-    char* buffer = malloc(sizeof(fontChars));
+    char* buffer = malloc(out_arr_size);
     if (buffer == NULL) {
         printf("ran out of memory\n");
         exit(-1);
     }
-    memcpy(buffer, fontChars, sizeof(fontChars));
+    memcpy(buffer, out_arr, out_arr_size);
     
-    FILE* wfp = fopen(out_file, "wb");
+    fp = fopen(out_file, "wb");
+    if (fp == NULL) {
+        printf("failed to open file\n");
+        exit(-1);
+    }
     
-    fwrite(buffer, sizeof(bmchar), sizeof(fontChars) / sizeof(bmchar), wfp);
+    fwrite(buffer, sizeof(bmchar), out_arr_size / sizeof(bmchar), fp);
     
     free(buffer);
-    fclose(wfp);
+    fclose(fp);
 }
 
-void loadBMCharsFromBin(char* in_file) {
+void loadBMCharsFromBin(char* in_file, bmchar* out_arr, size_t out_arr_size) {
     FILE* fp = fopen(in_file, "rb");
+    if (fp == NULL) {
+        printf("failed to open file\n");
+        exit(-1);
+    }
     
-    char* buffer = malloc(sizeof(otherFontChars));
-    fread(buffer, sizeof(bmchar), sizeof(otherFontChars) / sizeof(bmchar), fp);
-    memcpy(otherFontChars, buffer, sizeof(otherFontChars));
+    char* buffer = malloc(out_arr_size);
+    if (buffer == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
+    fread(buffer, sizeof(bmchar), out_arr_size / sizeof(bmchar), fp);
+    memcpy(out_arr, buffer, out_arr_size);
     
     free(buffer);
     fclose(fp);
@@ -1562,8 +1603,8 @@ int main() {
     setupObjects();
     createCommandBuffers();
     createSyncObjects();
-    //writeBMCharsToBin("fonts/Bitter.fnt", "fonts/Bitter.fnt.bin");
-    loadBMCharsFromBin("fonts/Bitter.fnt.bin");
+    //writeBMCharsToBin("fonts/Bitter.fnt", "fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
+    loadBMCharsFromBin("fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
     drawLoop();
     cleanup();
 }

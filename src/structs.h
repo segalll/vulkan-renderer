@@ -42,4 +42,14 @@ typedef struct DrawableObject {
     char* shader;
 } DrawableObject;
 
+typedef struct bmchar {
+    int x, y;
+    int width;
+    int height;
+    int xoffset;
+    int yoffset;
+    int xadvance;
+    int page;
+} bmchar;
+
 #endif /* structs_h */

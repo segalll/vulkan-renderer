@@ -66,3 +66,5 @@ targets:
               script: $PROJECT_DIR/Libraries/vulkansdk/macOS/bin/glslc $INPUT_FILE_DIR/$INPUT_FILE_NAME -o $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_NAME.spv
               outputFiles:
                   - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_NAME.spv
+        postBuildScripts:
+            - script: cp $PROJECT_DIR/../res/fonts/*.fnt* $BUILT_PRODUCTS_DIR/fonts/

@@ -89,6 +89,9 @@ DrawableObject objects[2];
 
 HashTable* objectShaders;
 
+bmchar fontChars[255];
+bmchar otherFontChars[255];
+
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
     PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != NULL) {
@@ -1273,6 +1276,76 @@ void cleanupSwapchain() {
     vkDestroyDescriptorPool(device, descriptorPool, NULL);
 }
 
+void writeBMCharsToBin(char* in_file, char* out_file) {
+    FILE* fp = fopen(in_file, "r");
+    char* line_buf = NULL;
+    size_t line_buf_size = 0;
+    size_t line_size;
+    
+    line_size = getline(&line_buf, &line_buf_size, fp);
+    
+    bool foundChar = false;
+    
+    while (line_size >= 0) {
+        char* token = strtok(line_buf, " ");
+        if (strcmp(token, "char") == 0) {
+            if (!foundChar) foundChar = true;
+            token = strtok(NULL, " id=");
+            int charid = atoi(token);
+            token = strtok(NULL, " x=");
+            fontChars[charid].x = atoi(token);
+            token = strtok(NULL, " y=");
+            fontChars[charid].y = atoi(token);
+            token = strtok(NULL, " width=");
+            fontChars[charid].width = atoi(token);
+            token = strtok(NULL, " height=");
+            fontChars[charid].height = atoi(token);
+            token = strtok(NULL, " xoffset=");
+            fontChars[charid].xoffset = atoi(token);
+            token = strtok(NULL, " yoffset=");
+            fontChars[charid].yoffset = atoi(token);
+            token = strtok(NULL, " xadvance=");
+            fontChars[charid].xadvance = atoi(token);
+            token = strtok(NULL, " page=");
+            fontChars[charid].page = atoi(token);
+            printf("%d parsed\n", charid);
+        } else {
+            if (foundChar) break;
+        }
+        
+        line_size = getline(&line_buf, &line_buf_size, fp);
+    }
+    
+    free(line_buf);
+    fclose(fp);
+    
+    char* buffer = malloc(sizeof(fontChars));
+    if (buffer == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
+    memcpy(buffer, fontChars, sizeof(fontChars));
+    
+    FILE* wfp = fopen(out_file, "wb");
+    
+    fwrite(buffer, sizeof(bmchar), sizeof(fontChars) / sizeof(bmchar), wfp);
+    
+    free(buffer);
+    fclose(wfp);
+}
+
+void loadBMCharsFromBin(char* in_file) {
+    FILE* fp = fopen(in_file, "rb");
+    
+    char* buffer = malloc(sizeof(otherFontChars));
+    fread(buffer, sizeof(bmchar), sizeof(otherFontChars) / sizeof(bmchar), fp);
+    memcpy(otherFontChars, buffer, sizeof(otherFontChars));
+    
+    free(buffer);
+    fclose(fp);
+}
+
+
 void createObject(DrawableObject* object, vec2 pos, char* shader) {
     glm_mat4_identity(object->ubo.model);
     vec3 pos3;
@@ -1489,6 +1562,8 @@ int main() {
     setupObjects();
     createCommandBuffers();
     createSyncObjects();
+    //writeBMCharsToBin("fonts/Bitter.fnt", "fonts/Bitter.fnt.bin");
+    loadBMCharsFromBin("fonts/Bitter.fnt.bin");
     drawLoop();
     cleanup();
 }

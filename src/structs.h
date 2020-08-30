@@ -52,4 +52,9 @@ typedef struct bmchar {
     int page;
 } bmchar;
 
+typedef struct vertex {
+    float pos[3];
+    //float uv[2];
+} vertex;
+
 #endif /* structs_h */

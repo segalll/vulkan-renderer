@@ -24,7 +24,7 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 const uint32_t validationLayersCount = 1;
-const char** validationLayers[1] = {
+const char* validationLayers[1] = {
     "VK_LAYER_KHRONOS_validation"
 };
 
@@ -72,6 +72,12 @@ VkDeviceMemory vertexBufferMemory;
 VkBuffer indexBuffer;
 VkDeviceMemory indexBufferMemory;
 
+VkBuffer textVertexBuffer;
+VkDeviceMemory textVertexBufferMemory;
+VkBuffer textIndexBuffer;
+VkDeviceMemory textIndexBufferMemory;
+uint32_t textIndexCount;
+
 VkDescriptorPool descriptorPool;
 
 VkCommandBuffer* commandBuffers;
@@ -84,8 +90,8 @@ size_t currentFrame = 0;
 
 bool framebufferResized = false;
 
-const uint32_t objectCount = 2;
-DrawableObject objects[2];
+const uint32_t objectCount = 1;
+DrawableObject objects[1];
 
 HashTable* objectShaders;
 
@@ -112,16 +118,16 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 VkVertexInputBindingDescription getVertexBindingDescription() {
     VkVertexInputBindingDescription bindingDescription;
     bindingDescription.binding = 0;
-    bindingDescription.stride = 5 * sizeof(float);
+    bindingDescription.stride = sizeof(vertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     return bindingDescription;
 }
 
 VkVertexInputAttributeDescription* getVertexAttributeDescriptions(int* attributeDescriptionCount) {
-    *attributeDescriptionCount = 2;
+    *attributeDescriptionCount = 1;
 
-    VkVertexInputAttributeDescription* attributeDescriptions = malloc(2 * sizeof(VkVertexInputAttributeDescription));
+    VkVertexInputAttributeDescription* attributeDescriptions = malloc(1 * sizeof(VkVertexInputAttributeDescription));
     if (attributeDescriptions == NULL) {
         printf("ran out of memory\n");
         exit(-1);
@@ -129,25 +135,20 @@ VkVertexInputAttributeDescription* getVertexAttributeDescriptions(int* attribute
 
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     attributeDescriptions[0].offset = 0 * sizeof(float);
-
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = 2 * sizeof(float);
 
     return attributeDescriptions;
 }
 
-const float vertices[] = {
-    -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-    0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-    0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
-    -0.5f, 0.5f, 1.0f, 1.0f, 1.0f
+const vertex vertices[] = {
+    { { -0.5f, -0.5f, 0.0f } },
+    { { 0.5f, -0.5f, 0.0f } },
+    { { 0.5f, 0.5f, 0.0f } },
+    { { -0.5f, 0.5f, 0.0f } }
 };
 
-const uint16_t indices[] = {
+const uint32_t indices[] = {
     0, 1, 2, 2, 3, 0
 };
 
@@ -1155,14 +1156,14 @@ void createCommandBuffers() {
 
         for (uint32_t j = 0; j < objectCount; j++) {
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, objects[j].graphicsPipeline);
-            VkBuffer vertexBuffers[] = { vertexBuffer };
+            VkBuffer vertexBuffers[] = { textVertexBuffer };
             VkDeviceSize offsets[] = { 0 };
             vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindIndexBuffer(commandBuffers[i], textIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
             
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, objects[j].pipelineLayout, 0, 1, &(objects[j].descriptorSets[i]), 0, NULL);
-            vkCmdDrawIndexed(commandBuffers[i], sizeof(indices) / sizeof(indices[0]), 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffers[i], textIndexCount, 1, 0, 0, 0);
         }
 
         vkCmdEndRenderPass(commandBuffers[i]);
@@ -1235,49 +1236,6 @@ void setupObjects() {
         }
         createDescriptorSets(&objects[i]);
     }
-}
-
-void cleanupSwapchain() {
-    for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        vkDestroyFramebuffer(device, swapchainFramebuffers[i], NULL);
-    }
-
-    free(swapchainFramebuffers);
-
-    vkFreeCommandBuffers(device, commandPool, swapchainImageCount, commandBuffers);
-
-    free(commandBuffers);
-    
-    for (uint32_t i = 0; i < objectCount; i++) {
-        if (i == 0 || strcmp(objects[i - 1].shader, objects[i].shader) != 0) {
-            vkDestroyPipeline(device, objects[i].graphicsPipeline, NULL);
-            vkDestroyPipelineLayout(device, objects[i].pipelineLayout, NULL);
-        }
-    }
-    
-    vkDestroyRenderPass(device, renderPass, NULL);
-
-    for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        vkDestroyImageView(device, swapchainImageViews[i], NULL);
-    }
-
-    free(swapchainImageViews);
-    free(swapchainImages);
-
-    vkDestroySwapchainKHR(device, oldSwapchain, NULL);
-    
-    for (uint32_t i = 0; i < objectCount; i++) {
-        for (uint32_t j = 0; j < swapchainImageCount; j++) {
-            vkDestroyBuffer(device, objects[i].uniformBuffers[j], NULL);
-            vkFreeMemory(device, objects[i].uniformBuffersMemory[j], NULL);
-        }
-        
-        free(objects[i].uniformBuffers);
-        free(objects[i].uniformBuffersMemory);
-        free(objects[i].descriptorSets);
-    }
-    
-    vkDestroyDescriptorPool(device, descriptorPool, NULL);
 }
 
 void writeBMCharsToBin(char* in_file, char* out_file, bmchar* out_arr, size_t out_arr_size) {
@@ -1389,12 +1347,135 @@ void loadBMCharsFromBin(char* in_file, bmchar* out_arr, size_t out_arr_size) {
 
 void createObject(DrawableObject* object, vec2 pos, char* shader) {
     glm_mat4_identity(object->ubo.model);
-    vec3 pos3;
-    pos3[0] = pos[0];
-    pos3[1] = pos[1];
-    pos3[2] = 0.0f;
+    vec3 pos3 = (vec3){ pos[0], pos[1], 0.0f };
     glm_translate(object->ubo.model, pos3);
     object->shader = shader;
+}
+
+void generateText(const char* text, const uint32_t text_length) {
+    vertex* vertices = malloc(text_length * 4 * sizeof(vertex));
+    uint32_t* textIndices = malloc(text_length * 6 * sizeof(uint32_t));
+    if (vertices == NULL || textIndices == NULL) {
+        printf("ran out of memory\n");
+        exit(-1);
+    }
+    
+    uint32_t indexOffset = 0;
+
+    float posx = 0.0f;
+    float posy = 0.0f;
+    
+    textIndexCount = 0;
+    uint32_t textVertexCount = 0;
+    
+    for (uint32_t i = 0; i < text_length; i++) {
+        if (text[i] == '\0') break;
+        
+        bmchar* charInfo = &fontChars[(int)text[i]];
+
+        if (charInfo->width == 0) {
+            charInfo->width = 36;
+        }
+
+        float charw = ((float)(charInfo->width) / 36.0f);
+        float dimx = 1.0f * charw;
+        float charh = ((float)(charInfo->height) / 36.0f);
+        float dimy = 1.0f * charh;
+
+        float xo = charInfo->xoffset / 36.0f;
+        float yo = charInfo->yoffset / 36.0f;
+
+        posy = yo;
+
+        vertices[i * 4] = (vertex){ posx + dimx + xo, posy + dimy, 0.0f };
+        vertices[(i * 4) + 1] = (vertex){ posx + xo, posy + dimy, 0.0f };
+        vertices[(i * 4) + 2] = (vertex){ posx + xo, posy, 0.0f };
+        vertices[(i * 4) + 3] = (vertex){ posx + dimx + xo, posy, 0.0f };
+        
+        textVertexCount += 4;
+
+        uint32_t letterIndices[] = { 0, 1, 2, 2, 3, 0 };
+        for (uint32_t j = 0; j < 6; j++) {
+            textIndices[(i * 6) + j] = (indexOffset + letterIndices[j]);
+        }
+        indexOffset += 4;
+        
+        textIndexCount += 6;
+
+        float advance = ((float)(charInfo->xadvance) / 36.0f);
+        posx += advance;
+    }
+
+    // Center
+    for (uint32_t i = 0; i < textVertexCount; i++) {
+        vertices[i].pos[0] -= posx / 2.0f;
+        vertices[i].pos[1] -= 0.5f;
+    }
+    
+    void* data;
+    
+    createBuffer(textVertexCount * sizeof(vertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &textVertexBuffer, &textVertexBufferMemory);
+    
+    data = NULL;
+    
+    vkMapMemory(device, textVertexBufferMemory, 0, textVertexCount * sizeof(vertex), 0, &data);
+    memcpy(data, vertices, textVertexCount * sizeof(vertex));
+    vkUnmapMemory(device, textVertexBufferMemory);
+    
+    free(vertices);
+    
+    createBuffer(textIndexCount * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &textIndexBuffer, &textIndexBufferMemory);
+    
+    data = NULL;
+    
+    vkMapMemory(device, textIndexBufferMemory, 0, textIndexCount * sizeof(uint32_t), 0, &data);
+    memcpy(data, textIndices, textIndexCount * sizeof(uint32_t));
+    vkUnmapMemory(device, textIndexBufferMemory);
+    
+    free(textIndices);
+}
+
+void cleanupSwapchain() {
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        vkDestroyFramebuffer(device, swapchainFramebuffers[i], NULL);
+    }
+
+    free(swapchainFramebuffers);
+
+    vkFreeCommandBuffers(device, commandPool, swapchainImageCount, commandBuffers);
+
+    free(commandBuffers);
+    
+    for (uint32_t i = 0; i < objectCount; i++) {
+        if (i == 0 || strcmp(objects[i - 1].shader, objects[i].shader) != 0) {
+            vkDestroyPipeline(device, objects[i].graphicsPipeline, NULL);
+            vkDestroyPipelineLayout(device, objects[i].pipelineLayout, NULL);
+        }
+    }
+    
+    vkDestroyRenderPass(device, renderPass, NULL);
+
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        vkDestroyImageView(device, swapchainImageViews[i], NULL);
+    }
+
+    free(swapchainImageViews);
+    free(swapchainImages);
+
+    vkDestroySwapchainKHR(device, oldSwapchain, NULL);
+    
+    for (uint32_t i = 0; i < objectCount; i++) {
+        for (uint32_t j = 0; j < swapchainImageCount; j++) {
+            vkDestroyBuffer(device, objects[i].uniformBuffers[j], NULL);
+            vkFreeMemory(device, objects[i].uniformBuffersMemory[j], NULL);
+        }
+        
+        free(objects[i].uniformBuffers);
+        free(objects[i].uniformBuffersMemory);
+        free(objects[i].descriptorSets);
+    }
+    
+    vkDestroyDescriptorPool(device, descriptorPool, NULL);
 }
 
 void recreateSwapchain() {
@@ -1422,25 +1503,9 @@ void recreateSwapchain() {
 
 void updateUniformBuffer(uint32_t currentImage) {
     for (uint32_t i = 0; i < objectCount; i++) {
-        vec3 rotationAxis;
-        rotationAxis[0] = 0.0f;
-        rotationAxis[1] = 0.0f;
-        rotationAxis[2] = 1.0f;
-        glm_rotate(objects[i].ubo.model, glm_rad(2.0f), rotationAxis);
+        glm_mat4_identity(objects[i].ubo.view);
         
-        vec3 eye;
-        eye[0] = 2.0f;
-        eye[1] = 2.0f;
-        eye[2] = 2.0f;
-        vec3 center;
-        glm_vec3_zero(center);
-        vec3 up;
-        up[0] = 0.0f;
-        up[1] = 0.0f;
-        up[2] = 1.0f;
-        glm_lookat(eye, center, up, objects[i].ubo.view);
-        
-        glm_perspective(glm_rad(45.0f), (float)swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f, objects[i].ubo.projection);
+        glm_ortho_default((float)swapchainExtent.width / (float)swapchainExtent.height, objects[i].ubo.projection);
         objects[i].ubo.projection[1][1] *= -1;
         
         void* data;
@@ -1541,6 +1606,12 @@ void cleanup() {
 
     vkDestroyBuffer(device, vertexBuffer, NULL);
     vkFreeMemory(device, vertexBufferMemory, NULL);
+    
+    vkDestroyBuffer(device, textVertexBuffer, NULL);
+    vkFreeMemory(device, textVertexBufferMemory, NULL);
+    
+    vkDestroyBuffer(device, textIndexBuffer, NULL);
+    vkFreeMemory(device, textIndexBufferMemory, NULL);
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
@@ -1591,20 +1662,15 @@ int main() {
     createIndexBuffer();
     createUniformBuffers();
     createDescriptorPool();
-    vec2 left;
-    left[0] = -0.5f;
-    left[1] = 0.5f;
-    vec2 right;
-    right[0] = 0.5f;
-    right[1] = -0.5f;
-    createObject(&objects[0], left, "shader");
-    createObject(&objects[1], right, "shader");
+    //writeBMCharsToBin("fonts/Bitter.fnt", "fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
+    loadBMCharsFromBin("fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
+    generateText("hello", sizeof("hello"));
+    createObject(&objects[0], (vec2){ 0.0f, 0.0f }, "shader");
+    //createObject(&objects[1], (vec2){ 0.5f, 0.0f }, "shader");
     setupObjectShaderMap();
     setupObjects();
     createCommandBuffers();
     createSyncObjects();
-    //writeBMCharsToBin("fonts/Bitter.fnt", "fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
-    loadBMCharsFromBin("fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
     drawLoop();
     cleanup();
 }

@@ -40,6 +40,10 @@ targets:
             path: Generated/app.entitlements
         sources:
             - path: ../src
+              excludes:
+                - "shaders/*.frag"
+                - "shaders/*.vert"
+            - path: ../src/shaders
               buildPhase: sources
         settings:
             HEADER_SEARCH_PATHS:

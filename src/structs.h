@@ -54,7 +54,17 @@ typedef struct bmchar {
 
 typedef struct vertex {
     float pos[3];
-    //float uv[2];
+    float tex[2];
 } vertex;
+
+typedef struct texture {
+    VkSampler sampler;
+    VkImage image;
+    VkImageLayout imageLayout;
+    VkDeviceMemory deviceMemory;
+    VkImageView view;
+    uint32_t width, height;
+    uint32_t mipLevels;
+} texture;
 
 #endif /* structs_h */

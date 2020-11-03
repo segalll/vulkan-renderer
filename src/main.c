@@ -15,9 +15,6 @@
 
 #include <cglm/cglm.h>
 
-#include <ktx.h>
-#include <ktxvulkan.h>
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -1138,7 +1135,7 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t 
 
 void createTextureImage() {
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("Bitter.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load("fonts/Bitter.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels) {
@@ -1567,10 +1564,11 @@ void loadBMCharsFromBin(char* in_file, bmchar* out_arr, size_t out_arr_size) {
 }
 
 
-void createObject(DrawableObject* object, vec2 pos, char* shader) {
+void createObject(DrawableObject* object, vec2 pos, float scale, char* shader) {
     glm_mat4_identity(object->ubo.model);
-    vec3 pos3 = (vec3){ pos[0], pos[1], 0.0f };
+    vec3 pos3 = {pos[0], pos[1], 0.0f};
     glm_translate(object->ubo.model, pos3);
+    glm_scale_uni(object->ubo.model, scale);
     object->shader = shader;
 }
 
@@ -1917,9 +1915,9 @@ int main() {
     createDescriptorPool();
     //writeBMCharsToBin("fonts/Bitter.fnt", "fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
     loadBMCharsFromBin("fonts/Bitter.fnt.bin", fontChars, sizeof(fontChars));
-    generateText("TEST", sizeof("TEST"));
-    createObject(&objects[0], (vec2){ 0.0f, 0.0f }, "shader");
-    //createObject(&objects[1], (vec2){ 0.5f, 0.0f }, "shader");
+    generateText("hello", sizeof("hello"));
+    createObject(&objects[0], (vec2){ 0.0f, 0.0f }, 0.5f, "shader");
+    //createObject(&objects[1], (vec2){ 0.5f, 0.0f }, 1.0f, "shader");
     setupObjectShaderMap();
     setupObjects();
     createCommandBuffers();

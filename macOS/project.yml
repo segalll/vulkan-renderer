@@ -72,6 +72,6 @@ targets:
               outputFiles:
                   - $BUILT_PRODUCTS_DIR/shaders/$INPUT_FILE_NAME.spv
         postBuildScripts:
-            - script: cp $PROJECT_DIR/../res/fonts/*.fnt* $BUILT_PRODUCTS_DIR/fonts/
+            - script: cp $PROJECT_DIR/../res/fonts/* $BUILT_PRODUCTS_DIR/fonts/
             - script: cp $PROJECT_DIR/../res/sdf/*.png $BUILT_PRODUCTS_DIR/sdf/
             - script: cp $PROJECT_DIR/../res/msdf/*.png $BUILT_PRODUCTS_DIR/msdf/

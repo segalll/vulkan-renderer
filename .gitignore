@@ -5,6 +5,6 @@ macOS/Libraries
 macOS/DerivedData
 **/.DS_STORE
 windows/.vs
-windows/out
-windows/.idea
+**/.idea
+bin
 windows/cmake-build-debug

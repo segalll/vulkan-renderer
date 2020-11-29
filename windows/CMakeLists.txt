@@ -4,36 +4,36 @@ project(vulkan)
 
 set(VULKAN_SDK_DIR "C:/VulkanSDK/1.2.141.2")
 set(GLFW_DIR "A:/Coding/glfw")
-set(CGLM_DIR "A:/Coding/cglm")
+set(GLM_DIR "A:/Coding/glm")
 set(STB_DIR "A:/Coding/stb")
+set(TINYOBJLOADER_DIR "A:/Coding/tinyobjloader")
 set(MAIN_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/out)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 
 set(LIB_VULKAN ${VULKAN_SDK_DIR}/Lib/vulkan-1.lib)
 set(LIB_GLFW ${GLFW_DIR}/lib/glfw3.lib)
-set(LIB_CGLM ${CGLM_DIR}/lib/cglm.lib)
 
 include_directories(${VULKAN_SDK_DIR}/Include)
 include_directories(${GLFW_DIR}/include)
-include_directories(${CGLM_DIR}/include)
+include_directories(${GLM_DIR}/include)
 include_directories(${STB_DIR}/include)
+include_directories(${TINYOBJLOADER_DIR}/include)
 
-file(GLOB_RECURSE C_HEADERS ${MAIN_SOURCE_DIR}/*.h)
-file(GLOB_RECURSE C_SOURCES ${MAIN_SOURCE_DIR}/*.c)
+file(GLOB_RECURSE CPP_HEADERS ${MAIN_SOURCE_DIR}/*.h)
+file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/*.cpp)
 
 add_executable(
 	vulkan ${EXECUTABLE_TYPE}
-	${C_HEADERS}
-	${C_SOURCES}
+	${CPP_HEADERS}
+	${CPP_SOURCES}
 )
 
-set_property(TARGET vulkan PROPERTY C_STANDARD 11)
+set_property(TARGET vulkan PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(
 	vulkan
 	${LIB_VULKAN}
 	${LIB_GLFW}
-	${LIB_CGLM}
 )
 
 set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin/glslangValidator.exe")
@@ -71,8 +71,7 @@ add_custom_command(TARGET vulkan POST_BUILD
 )
 
 add_custom_command(TARGET vulkan POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:vulkan>/fonts/"
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${CMAKE_CURRENT_SOURCE_DIR}/../res/fonts"
-		"$<TARGET_FILE_DIR:vulkan>/fonts"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+		"${MAIN_SOURCE_DIR}/../res"
+		"$<TARGET_FILE_DIR:vulkan>"
 )
